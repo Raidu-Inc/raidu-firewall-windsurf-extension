@@ -1,0 +1,7 @@
+node_modules/
+dist/
+hooks/dist/
+webview/dist/
+*.log
+.env
+*.vsix
