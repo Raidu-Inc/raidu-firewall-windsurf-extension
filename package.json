@@ -1,5 +1,5 @@
 {
-  "name": "raidu-firewall-windsurf",
+  "name": "raidu-firewall",
   "displayName": "Raidu Firewall",
   "description": "AI Accountability Layer for Windsurf. Scans prompts for PII, blocks sensitive file access, full audit trail.",
   "version": "0.1.0",
