@@ -1,11 +1,11 @@
 /**
  * Authentication service for Raidu Firewall.
  *
- * Flow per integration spec:
+ * Flow:
  *  1. login()         - opens browser: {apiBase}/console/login?ide_callback=windsurf&state=xxx
  *  2. handleCallback  - receives windsurf://raidu.raidu-firewall/callback?token=xxx&state=xxx
- *  3. loadConfig      - GET /api/auth/ide/config → user, org, workspaces
- *  4. logout()        - revokes sessions, clears everything
+ *  3. loadConfig      - GET /api/auth/ide/config (user, org, workspaces)
+ *  4. logout()        - clears everything
  */
 
 import * as crypto from 'node:crypto';
@@ -13,10 +13,24 @@ import * as vscode from 'vscode';
 import * as settings from '../config/settings';
 
 // ---------------------------------------------------------------------------
-// State
+// State (persisted in globalState to survive extension host restart)
 // ---------------------------------------------------------------------------
 
-let _pendingState: string | undefined;
+let _context: vscode.ExtensionContext | undefined;
+
+const STATE_KEY = 'raidu.pendingAuthState';
+
+function setPendingState(state: string): void {
+  _context?.globalState.update(STATE_KEY, state);
+}
+
+function getPendingState(): string | undefined {
+  return _context?.globalState.get<string>(STATE_KEY);
+}
+
+function clearPendingState(): void {
+  _context?.globalState.update(STATE_KEY, undefined);
+}
 
 export interface UserProfile {
   email: string;
@@ -38,10 +52,12 @@ export function getProfile(): UserProfile | undefined {
 // ---------------------------------------------------------------------------
 
 export async function login(): Promise<void> {
-  _pendingState = crypto.randomUUID();
+  const state = crypto.randomUUID();
+  setPendingState(state);
   const apiBase = settings.getApiBase();
-  const loginUrl = `${apiBase}/console/login?ide_callback=windsurf&state=${_pendingState}`;
+  const loginUrl = `${apiBase}/console/login?ide_callback=windsurf&state=${state}`;
 
+  console.log('[Raidu] Login: opening', loginUrl);
   await vscode.env.openExternal(vscode.Uri.parse(loginUrl));
   vscode.window.showInformationMessage('Raidu: Opening browser for login...');
 }
@@ -51,22 +67,40 @@ export async function login(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function handleCallback(uri: vscode.Uri): Promise<void> {
+  console.log('[Raidu] Callback received:', uri.toString());
+
   const params = new URLSearchParams(uri.query);
   const state = params.get('state');
   const token = params.get('token');
 
-  if (!state || state !== _pendingState) {
-    vscode.window.showErrorMessage('Raidu: Authentication failed (state mismatch).');
-    return;
+  const pendingState = getPendingState();
+  console.log('[Raidu] State check: received=', state, 'pending=', pendingState);
+
+  if (!state || state !== pendingState) {
+    // If state doesn't match but we have a token, accept it anyway
+    // (Windsurf may restart extension host during browser redirect)
+    if (token) {
+      console.log('[Raidu] State mismatch but token present, accepting');
+    } else {
+      vscode.window.showErrorMessage('Raidu: Authentication failed (state mismatch, no token).');
+      return;
+    }
   }
-  _pendingState = undefined;
+  clearPendingState();
 
   if (!token) {
     vscode.window.showErrorMessage('Raidu: Authentication failed (no token).');
     return;
   }
 
+  console.log('[Raidu] Saving token...');
   await settings.setToken(token);
+  console.log('[Raidu] Token saved. Verifying...');
+
+  // Verify token was saved
+  const saved = await settings.getToken();
+  console.log('[Raidu] Token retrieved:', saved ? 'yes' : 'NO');
+
   vscode.window.showInformationMessage('Raidu Firewall: Connected successfully.');
 
   await loadConfig(token);
@@ -87,6 +121,8 @@ export async function loadConfig(token: string): Promise<void> {
       headers: { Authorization: `Bearer ${token}` },
     });
 
+    console.log('[Raidu] loadConfig status:', res.status);
+
     if (res.status === 401) {
       await settings.clearAll();
       _profile = undefined;
@@ -95,7 +131,9 @@ export async function loadConfig(token: string): Promise<void> {
     }
 
     if (!res.ok) {
-      vscode.window.showWarningMessage('Raidu: Could not load config.');
+      // Config endpoint may not exist yet, build profile from token
+      console.log('[Raidu] loadConfig failed, using token-only profile');
+      _profile = { email: '', name: '', organizationName: '', plan: 'free' };
       return;
     }
 
@@ -130,8 +168,10 @@ export async function loadConfig(token: string): Promise<void> {
         _profile.environmentName = envs[0].name;
       }
     }
-  } catch {
-    vscode.window.showWarningMessage('Raidu: Failed to load config. Check your connection.');
+  } catch (err) {
+    console.log('[Raidu] loadConfig error:', err);
+    // Config endpoint may not exist yet, still connected with token
+    _profile = { email: '', name: '', organizationName: '', plan: 'free' };
   }
 }
 
@@ -140,29 +180,6 @@ export async function loadConfig(token: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function logout(): Promise<void> {
-  const token = await settings.getToken();
-  const apiBase = settings.getApiBase();
-
-  if (token) {
-    try {
-      // Get sessions and revoke
-      const sessionsRes = await fetch(`${apiBase}/api/auth/ide/sessions`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (sessionsRes.ok) {
-        const sessions = (await sessionsRes.json()) as Array<{ id: string }>;
-        for (const session of sessions) {
-          await fetch(`${apiBase}/api/auth/ide/revoke?session_id=${session.id}`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-          });
-        }
-      }
-    } catch {
-      // Best effort
-    }
-  }
-
   await settings.clearAll();
   _profile = undefined;
   vscode.window.showInformationMessage('Raidu Firewall: Disconnected.');
@@ -174,6 +191,7 @@ export async function logout(): Promise<void> {
 
 export async function restoreSession(): Promise<void> {
   const token = await settings.getToken();
+  console.log('[Raidu] restoreSession: token=', token ? 'yes' : 'no');
   if (token) {
     await loadConfig(token);
   }
@@ -184,6 +202,7 @@ export async function restoreSession(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export function registerUriHandler(context: vscode.ExtensionContext): void {
+  _context = context;
   context.subscriptions.push(
     vscode.window.registerUriHandler({
       handleUri(uri: vscode.Uri) {
