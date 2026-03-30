@@ -2,7 +2,7 @@
  * Authentication service for Raidu Firewall.
  *
  * Flow per integration spec:
- *  1. login()         - opens browser: {apiBase}/api/auth/ide/login?ide=windsurf&state=xxx
+ *  1. login()         - opens browser: {apiBase}/console/login?ide_callback=windsurf&state=xxx
  *  2. handleCallback  - receives windsurf://raidu.raidu-firewall/callback?token=xxx&state=xxx
  *  3. loadConfig      - GET /api/auth/ide/config → user, org, workspaces
  *  4. logout()        - revokes sessions, clears everything
@@ -40,7 +40,7 @@ export function getProfile(): UserProfile | undefined {
 export async function login(): Promise<void> {
   _pendingState = crypto.randomUUID();
   const apiBase = settings.getApiBase();
-  const loginUrl = `${apiBase}/api/auth/ide/login?ide=windsurf&state=${_pendingState}`;
+  const loginUrl = `${apiBase}/console/login?ide_callback=windsurf&state=${_pendingState}`;
 
   await vscode.env.openExternal(vscode.Uri.parse(loginUrl));
   vscode.window.showInformationMessage('Raidu: Opening browser for login...');
