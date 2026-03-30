@@ -32,7 +32,7 @@ export function globToRegex(pattern: string): RegExp {
   return new RegExp(escaped, 'i');
 }
 
-/** Load policy from cache file, merge with .cursorignore if present, fall back to defaults. */
+/** Load policy from cache file, merge with ignore patterns if present, fall back to defaults. */
 export function loadPolicy(policyCachePath?: string, projectDir?: string): Policy {
   let policy: Policy = { ...DEFAULT_POLICY, files: { ...DEFAULT_POLICY.files, blocked: [...DEFAULT_POLICY.files.blocked], allowed: [...DEFAULT_POLICY.files.allowed] } };
 
@@ -45,7 +45,7 @@ export function loadPolicy(policyCachePath?: string, projectDir?: string): Polic
     } catch {}
   }
 
-  // Merge .cursorignore / .windsurf ignore patterns if present
+  // Merge IDE ignore patterns if present
   if (projectDir) {
     for (const ignoreFile of ['.cursorignore', '.windsurf/ignore']) {
       try {

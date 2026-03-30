@@ -1,6 +1,6 @@
 /**
  * Windsurf hook event types.
- * Different from Cursor: uses agent_action_name and tool_info.
+ * Windsurf uses agent_action_name and tool_info (not hook_event_name).
  */
 
 export interface WindsurfHookEvent {

@@ -2,9 +2,9 @@
  * Complete uninstall. Removes every trace of Raidu from the system.
  *
  *  1. Clears credentials (SecretStorage + token file + settings)
- *  2. Removes hooks from ~/.cursor/hooks.json
+ *  2. Removes hooks from ~/.codeium/windsurf/hooks.json
  *  3. Deletes ~/.raidu/ directory entirely (logs, token, policy cache)
- *  4. Removes plugin directory ~/.cursor/plugins/local/raidu-firewall/
+ *  4. Removes plugin directory if present
  */
 
 import * as fs from 'node:fs';
@@ -14,7 +14,7 @@ import { clearAll } from '../config/settings';
 import { removeHooks } from './hooks-installer';
 
 const RAIDU_HOME = path.join(os.homedir(), '.raidu');
-const PLUGIN_DIR = path.join(os.homedir(), '.cursor', 'plugins', 'local', 'raidu-firewall');
+const PLUGIN_DIR = path.join(os.homedir(), '.codeium', 'windsurf', 'plugins', 'local', 'raidu-firewall');
 
 export async function cleanup(): Promise<void> {
   const cleaned: string[] = [];
@@ -27,7 +27,7 @@ export async function cleanup(): Promise<void> {
     console.warn('[Raidu cleanup] credentials:', err);
   }
 
-  // 2. Remove hooks from ~/.cursor/hooks.json
+  // 2. Remove hooks from ~/.codeium/windsurf/hooks.json
   try {
     removeHooks();
     cleaned.push('hooks removed');

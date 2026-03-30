@@ -7,7 +7,7 @@
  *  3. Creates status bar
  *  4. Registers sidebar provider
  *  5. Registers commands (login, logout, showStatus, clearHistory)
- *  6. Installs hooks into ~/.cursor/hooks.json
+ *  6. Installs hooks into ~/.codeium/windsurf/hooks.json
  *  7. Starts log watcher
  *  8. Starts periodic status bar refresh (every 3 seconds)
  */
@@ -110,7 +110,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
-  // --- 6. Install hooks into ~/.cursor/hooks.json ---
+  // --- 6. Install hooks into ~/.codeium/windsurf/hooks.json ---
   installHooks(context.extensionPath);
 
   // --- 8. Start log watcher ---
@@ -176,7 +176,7 @@ export async function deactivate(): Promise<void> {
     refreshInterval = undefined;
   }
 
-  // 3. Remove hooks from ~/.cursor/hooks.json.
+  // 3. Remove hooks from ~/.codeium/windsurf/hooks.json.
   removeHooks();
 
   // 4. Clean uninstall (revert all changes).

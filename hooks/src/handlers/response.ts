@@ -8,7 +8,7 @@ import type { WindsurfHookEvent } from '../types';
 
 const logger = createLogger();
 
-const CURSORIGNORE_BLOCKED = [
+const RESPONSE_BLOCKED = [
   /permission denied/i,
   /access is blocked/i,
   /excluded/i,
@@ -22,7 +22,7 @@ export function handlePostCascadeResponse(event: WindsurfHookEvent): { block: fa
   if (!text) return { block: false };
 
   // Detect file access blocks from response text
-  if (CURSORIGNORE_BLOCKED.some((p) => p.test(text))) {
+  if (RESPONSE_BLOCKED.some((p) => p.test(text))) {
     logger.incStat('commandsBlocked');
     logger.audit({ event: 'post_cascade_response', action: 'data_blocked', reason: 'Raidu Firewall blocked sensitive file access', trajectoryId: event.trajectory_id });
     return { block: false };
