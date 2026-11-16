@@ -77,26 +77,49 @@ export function isSensitiveFile(filePath: string, policy: Policy): string | null
   return null;
 }
 
-/** Check tool input (file_path, glob, command) against policy. */
-export function checkInputForSensitiveFiles(input: Record<string, unknown>, policy: Policy): string | null {
+export interface SensitiveAccess {
+  /** User-facing reason, as shown in the block message. */
+  message: string;
+  kind: 'sensitive_file' | 'command_policy';
+  /** The policy pattern that matched. */
+  rule: string;
+  /** Basename of the file, when the input named one. */
+  fileName?: string;
+}
+
+/** Check tool input (file_path, glob, command) against policy, with structured details. */
+export function findSensitiveAccess(input: Record<string, unknown>, policy: Policy): SensitiveAccess | null {
   if (input.file_path) {
     const hit = isSensitiveFile(input.file_path as string, policy);
-    if (hit) return `Blocked access to ${path.basename(input.file_path as string)} (policy: ${hit})`;
+    if (hit) {
+      const fileName = path.basename(input.file_path as string);
+      return { message: `Blocked access to ${fileName} (policy: ${hit})`, kind: 'sensitive_file', rule: hit, fileName };
+    }
   }
   if (input.glob) {
     for (const p of policy.files.blocked) {
-      if (globToRegex(p).test(input.glob as string)) return `Blocked search for sensitive files (${input.glob})`;
+      if (globToRegex(p).test(input.glob as string))
+        return { message: `Blocked search for sensitive files (${input.glob})`, kind: 'sensitive_file', rule: p };
     }
   }
   if (input.command) {
     for (const p of policy.files.blocked) {
-      if (globToRegex(p).test(input.command as string)) return `Blocked shell access to ${p}`;
+      if (globToRegex(p).test(input.command as string))
+        return { message: `Blocked shell access to ${p}`, kind: 'sensitive_file', rule: p };
     }
     for (const p of policy.commands.blocked) {
-      try { if (new RegExp(p, 'i').test(input.command as string)) return `Blocked command (policy: ${p})`; } catch {}
+      try {
+        if (new RegExp(p, 'i').test(input.command as string))
+          return { message: `Blocked command (policy: ${p})`, kind: 'command_policy', rule: p };
+      } catch {}
     }
   }
   return null;
+}
+
+/** Check tool input (file_path, glob, command) against policy. */
+export function checkInputForSensitiveFiles(input: Record<string, unknown>, policy: Policy): string | null {
+  return findSensitiveAccess(input, policy)?.message ?? null;
 }
 
 export const EXFIL_PATTERNS: RegExp[] = [

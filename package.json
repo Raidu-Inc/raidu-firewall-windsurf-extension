@@ -26,6 +26,7 @@
     },
     "commands": [
       { "command": "raidu.login", "title": "Raidu: Connect" },
+      { "command": "raidu.pasteCallback", "title": "Raidu: Paste Login Callback URL" },
       { "command": "raidu.logout", "title": "Raidu: Disconnect" },
       { "command": "raidu.showStatus", "title": "Raidu: Show Status" },
       { "command": "raidu.clearHistory", "title": "Raidu: Clear History" }
