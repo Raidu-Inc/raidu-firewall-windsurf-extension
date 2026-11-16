@@ -12,6 +12,7 @@ import { handlePreReadCode, handlePreWriteCode, handlePostWriteCode } from './ha
 import { handlePreRunCommand, handlePostRunCommand } from './handlers/command';
 import { handlePreMCPToolUse, handlePostMCPToolUse } from './handlers/mcp';
 import { handlePostCascadeResponse } from './handlers/response';
+import { FLUSH_FLAG, flushReports, flushReportsInBackground } from './lib/report';
 
 const MAX_STDIN = 1_048_576;
 const logger = createLogger();
@@ -62,6 +63,11 @@ async function main(): Promise<void> {
     logger.debug(`ERR ${hookName}: ${(err as Error).message?.slice(0, 100)}`);
   }
 
+  // Send any queued block reports to Tower without delaying this hook.
+  try {
+    flushReportsInBackground();
+  } catch {}
+
   if (result.block) {
     process.stdout.write(result.message || 'Blocked by Raidu Firewall');
     process.exit(2);
@@ -70,4 +76,13 @@ async function main(): Promise<void> {
   process.stdout.write('{}');
 }
 
-main();
+if (process.argv.includes(FLUSH_FLAG)) {
+  // Detached background flusher started by flushReportsInBackground().
+  try {
+    flushReports();
+  } catch (err: unknown) {
+    logger.debug(`ERR flush: ${(err as Error).message?.slice(0, 100)}`);
+  }
+} else {
+  main();
+}

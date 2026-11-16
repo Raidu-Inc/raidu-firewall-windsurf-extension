@@ -3,7 +3,8 @@
  * Block sensitive file access by name pattern.
  */
 
-import { isSensitiveFile, loadPolicy, createLogger, scanTextLocal, entitySummary } from '../lib';
+import * as path from 'node:path';
+import { isSensitiveFile, loadPolicy, createLogger, scanTextLocal, entitySummary, reportBlock, WINDSURF_EVENT } from '../lib';
 import type { WindsurfHookEvent } from '../types';
 
 const logger = createLogger();
@@ -16,6 +17,13 @@ export function handlePreReadCode(event: WindsurfHookEvent): { block: boolean; m
   if (hit) {
     logger.incStat('commandsBlocked');
     logger.audit({ event: 'pre_read_code', action: 'blocked', filePath, reason: hit, trajectoryId: event.trajectory_id });
+    reportBlock(event, {
+      event: WINDSURF_EVENT.pre_read_code,
+      kind: 'sensitive_file',
+      detector: 'local',
+      rule: hit,
+      fileName: path.basename(filePath),
+    });
     return { block: true, message: `Raidu Firewall: Blocked reading ${filePath.split('/').pop()} (policy: ${hit}).` };
   }
 
@@ -30,6 +38,14 @@ export function handlePreWriteCode(event: WindsurfHookEvent): { block: boolean; 
   if (hit) {
     logger.incStat('commandsBlocked');
     logger.audit({ event: 'pre_write_code', action: 'blocked', filePath, reason: hit, trajectoryId: event.trajectory_id });
+    reportBlock(event, {
+      event: WINDSURF_EVENT.pre_write_code,
+      kind: 'sensitive_file',
+      detector: 'local',
+      tool: 'write',
+      rule: hit,
+      fileName: path.basename(filePath),
+    });
     return { block: true, message: `Raidu Firewall: Blocked writing to ${filePath.split('/').pop()} (policy: ${hit}).` };
   }
 

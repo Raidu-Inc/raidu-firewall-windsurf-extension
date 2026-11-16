@@ -3,7 +3,7 @@
  * Scans prompt for PII via API + local fallback.
  */
 
-import { scanText, formatEntities, redactText, copyToClipboard, entitySummary, createLogger } from '../lib';
+import { scanText, formatEntities, redactText, copyToClipboard, entitySummary, createLogger, reportScanBlockIfUnrecorded, WINDSURF_EVENT } from '../lib';
 import type { WindsurfHookEvent } from '../types';
 
 const logger = createLogger();
@@ -30,6 +30,7 @@ export function handlePreUserPrompt(event: WindsurfHookEvent): { block: boolean;
       scanTimeMs: result.scanTimeMs,
       trajectoryId: event.trajectory_id,
     });
+    reportScanBlockIfUnrecorded(event, result, { event: WINDSURF_EVENT.pre_user_prompt });
 
     return {
       block: true,

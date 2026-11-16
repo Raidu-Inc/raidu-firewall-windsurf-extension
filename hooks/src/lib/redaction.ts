@@ -36,21 +36,32 @@ export function scanText(
       score: e.confidence ?? 1.0,
     }));
     logger?.(`scan: API found ${entities.length} entities (${entities.map((e) => e.type).join(', ')})`);
-    return { entities, scanTimeMs: apiResult.processingTimeMs ?? performance.now() - start, source: 'api', sanitizedInput: apiResult.sanitizedInput };
+    return {
+      entities,
+      scanTimeMs: apiResult.processingTimeMs ?? performance.now() - start,
+      source: 'api',
+      sanitizedInput: apiResult.sanitizedInput,
+      // Older servers omit `evidence`; they always attempted the write.
+      detector: apiResult.evidence?.outcome === 'failed' ? 'api_unrecorded' : undefined,
+    };
   }
 
   if (apiResult && apiResult.passed) {
     const localCheck = localScanner.scan(text);
     if (localCheck.entities.length > 0) {
       logger?.(`scan: API passed but local found ${localCheck.entities.length} entities`);
-      return { ...localCheck, source: 'local' };
+      return { ...localCheck, source: 'local', detector: 'local' };
     }
     return { entities: [], scanTimeMs: performance.now() - start, source: 'api' };
   }
 
   const localResult = localScanner.scan(text);
   logger?.(`scan: local fallback (${localResult.entities.length} entities, ${localResult.scanTimeMs.toFixed(1)}ms)`);
-  return { ...localResult, source: 'local' };
+  return {
+    ...localResult,
+    source: 'local',
+    detector: localResult.entities.length > 0 ? 'api_unavailable' : undefined,
+  };
 }
 
 /** Local-only scan (for post-hoc detection where API call would be too slow). */
